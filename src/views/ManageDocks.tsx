@@ -1,13 +1,11 @@
 import React, { useState, useRef } from 'react';
-import { Table, Row, Col, Modal, Form, DatePicker, Select, Switch, notification } from 'antd';
+import { Table, Row, Col, Modal, Form, DatePicker, Select, Switch, notification, Button, Input, Space, Layout, theme } from 'antd';
+import { DeleteTwoTone, SearchOutlined, FileAddTwoTone, ReconciliationTwoTone } from '@ant-design/icons';
+import Highlighter from 'react-highlight-words';
+import dayjs from 'dayjs';
+import type { FilterConfirmProps, TableRowSelection } from 'antd/es/table/interface';
 
 import { useDockList } from '../hooks/useDockList';
-import { Button, Input, Space } from 'antd';
-import { DeleteTwoTone, SearchOutlined, FileAddTwoTone } from '@ant-design/icons';
-import Highlighter from 'react-highlight-words';
-import type { FilterConfirmProps } from 'antd/es/table/interface';
-import dayjs from 'dayjs';
-
 import { DataIndex, Dock, DockItems, NotificationType } from '../interfaces/DockInterfaces';
 import { convertDateFormat, generateRandomString } from '../helpers/utils';
 import { confirmDeleteItem, openDeleteModal } from './DockHandlers';
@@ -20,25 +18,21 @@ const ManageDocks = () => {
     const [itemsSearch, setItemsSearch] = useState<DockItems | null>();
     const [searchText, setSearchText] = useState<string>('');
     const [searchedColumn, setSearchedColumn] = useState<string>('');
+    const [interactionItem, setInteractionItem] = useState<Dock | null>(null);
     const [open, setOpen] = useState<boolean>(false);
     const [deleteModal, setDeleteModal] = useState<boolean>(false);
-    const [interactionItem, setInteractionItem] = useState<Dock | null>(null);
 
     const { Search } = Input;
     const { Option } = Select;
     const [form] = Form.useForm();
     const [api, contextHolder] = notification.useNotification();
+    const { Header, Content } = Layout;
+    const { token: { colorBgContainer }, } = theme.useToken();
 
-    const openNotificationCreateWithIcon = (type: NotificationType) => {
+    const openNotificationWithIcon = (type: NotificationType, message: string, description: string) => {
         api[type]({
-            message: "Registro Creado",
-            description: "El registro fue creado con exito",
-        });
-    };
-    const openNotificationDeleteWithIcon = (type: NotificationType) => {
-        api[type]({
-            message: "Registro Eliminado",
-            description: "El registro fue eliminado con exito",
+            message,
+            description,
         });
     };
 
@@ -139,8 +133,7 @@ const ManageDocks = () => {
             title: 'Última Fecha Programada',
             dataIndex: 'lastSchedulingDate',
             key: 'lastSchedulingDate',
-            render: (text: string) => <div>{convertDateFormat(text)}</div>,
-            defaultSortOrder: 'descend',
+            render: (text: string) => <div>{convertDateFormat(text)} <br /> {convertDateFormat(text, true)}</div>,
             sorter: {
                 compare: (a: any, b: any) => {
                     a = a.lastSchedulingDate.toLowerCase()
@@ -178,7 +171,15 @@ const ManageDocks = () => {
             title: 'Acciones',
             dataIndex: 'id',
             key: 'id',
-            render: (text: string) => <Button onClick={(e: any) => deleteAllHandler(text)}><DeleteTwoTone twoToneColor="#eb2f96" /></Button>
+            render: (text: string) => {
+                return (
+                    <Row>
+                        <Col>
+                            <Button onClick={(e: any) => deleteAllHandler(text)}><DeleteTwoTone twoToneColor="#eb2f96" /></Button>
+                        </Col>
+                    </Row>
+                )
+            }
         }
     ];
 
@@ -201,68 +202,88 @@ const ManageDocks = () => {
         openDeleteModal(event, items, setInteractionItem, setDeleteModal);
 
     const onSearch = (value: string) => {
-        setItemsSearch(items.filter( item => item.id.toString()
-        .toLowerCase()
-        .includes((value as string).toLowerCase()) || item.name.toLowerCase()
-        .includes((value as string).toLowerCase()) ));
+        setItemsSearch(items.filter(item => item.id.toString()
+            .toLowerCase()
+            .includes((value as string).toLowerCase()) || item.name.toLowerCase()
+                .includes((value as string).toLowerCase())));
     }
 
     const deleteItem = () => {
+        const message = "Registro Eliminado";
+        const description = "El registro ha sido eliminado con exito";
+
         setDeleteModal(false);
         confirmDeleteItem(interactionItem, setItems);
-        openNotificationDeleteWithIcon('success');
+        openNotificationWithIcon('success', message, description);
         setInteractionItem(null);
     };
 
     const handleSave = (values: any) => {
-        const { $d } = values.lastSchedulingDate;
+        const message = "Registro Creado";
+        const description = "El registro ha sido creado con exito";
+        const { $d } = values.date;
         const newItem: Dock = {
-            id: generateRandomString(36),
+            id: generateRandomString(8) + '-' + generateRandomString(4) + '-' + generateRandomString(4) + '-' + generateRandomString(4) + '-' + generateRandomString(12),
             name: values.name,
             lastSchedulingDate: $d.toString(),
             hasCrossDocking: values.hasCrossDocking ? values.hasCrossDocking : false
         }
+
         setItems([...items, newItem]);
-        openNotificationCreateWithIcon('success');
+        openNotificationWithIcon('success', message, description);
+        form.resetFields();
         setOpen(false);
     };
 
     return (
-        <>
+        <Layout>
             {contextHolder}
-            <Row>
-                <Col span={5}>
-                    <h2>Entradas de Cedis Principal</h2>
-                </Col>
-            </Row>
+            <Layout>
+                <Header style={{ padding: 0, background: colorBgContainer }}>
+                    <Row justify="left" align="top">
+                        <Col span={5}>
+                            <h2><ReconciliationTwoTone twoToneColor="#389e0d" /> Entradas de Cedis Principal</h2>
+                        </Col>
+                    </Row>
+                </Header>
 
-            <Row>
-                <Col span={5} push={1}>
-                    <Button
-                        block
-                        onClick={() => setOpen(true)}
-                    >
-                        <FileAddTwoTone />
-                        Nueva Entrada
-                    </Button>
-                </Col>
-                <Col span={6}>
-                    <Search placeholder="Buscar por Id o Nombre" onSearch={onSearch} style={{ width: 250 }} />
-                </Col>
-            </Row>
-            <br />
-            <Row justify="center">
-                <Col span={23}>
-                    <Table columns={columns} dataSource={!itemsSearch ? items : itemsSearch } />
-                </Col>
-            </Row>
+                <Content
+                    style={{
+                        margin: '24px 16px',
+                        padding: 24,
+                        minHeight: 280,
+                        background: colorBgContainer,
+                    }}
+                >
+                    <Row>
+                        <Col span={5} push={1}>
+                            <Button
+                                block
+                                onClick={() => setOpen(true)}
+                            >
+                                <FileAddTwoTone />
+                                Nueva Entrada
+                            </Button>
+                        </Col>
+                        <Col span={6}>
+                            <Search placeholder="Buscar por Id o Nombre" onSearch={onSearch} style={{ width: 250 }} />
+                        </Col>
+                    </Row>
+                    <br />
+                    <Row justify="center">
+                        <Col span={23}>
+                            <Table columns={columns} dataSource={!itemsSearch ? items : itemsSearch} bordered pagination={{ defaultPageSize: 8, showSizeChanger: true, pageSizeOptions: ['10', '20', '30'] }}/>
+                        </Col>
+                    </Row>
+                </Content>
+            </Layout>
 
             <Modal
                 title="Nueva Entrada"
                 centered
                 open={open}
                 onOk={form.submit}
-                onCancel={() => setOpen(false)}
+                onCancel={() => { form.resetFields(); setOpen(false); }}
                 width={1000}
             >
                 <Form form={form} onFinish={handleSave}>
@@ -277,10 +298,10 @@ const ManageDocks = () => {
                             <Option value="Dock G">Dock G</Option>
                         </Select>
                     </Form.Item>
-                    <Form.Item label="Fecha programada" name="lastSchedulingDate" rules={[{ required: true }]}>
+                    <Form.Item label="Fecha programada" name="date" rules={[{ required: true }]}>
                         <DatePicker showTime={{ defaultValue: dayjs('00:00:00', 'HH:mm:ss') }} />
                     </Form.Item>
-                    <Form.Item label="Cross-Docking" name="hasCrossDocking" valuePropName="true">
+                    <Form.Item label="Cross-Docking" name="hasCrossDocking">
                         <Switch>
                             Si
                         </Switch>
@@ -295,13 +316,15 @@ const ManageDocks = () => {
                 title="Eliminar registro"
                 centered
                 open={deleteModal}
-                onOk={() => deleteItem()}
-                onCancel={() => setDeleteModal(false)}
+                footer={[
+                    <Button key='back' onClick={() => setDeleteModal(false)}>Cancel</Button>,
+                    <Button type="primary" danger onClick={deleteItem}>Delete</Button>
+                ]}
                 width={1000}
             >
                 <p>Deseas eliminar el registro con nombre <span className="text-bold">{interactionItem?.name}</span> fecha programada <span className="text-bold">{convertDateFormat(interactionItem?.lastSchedulingDate)}</span>? </p>
             </Modal>
-        </>
+        </Layout>
     )
 }
 
